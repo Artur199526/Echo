@@ -3,131 +3,134 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Echo Pro — Исправленная версия</title>
+    <title>Echo Pro — Ultimate Debug</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
-        body { background: #020617; color: #f8fafc; font-family: sans-serif; }
-        .echo-card { background: #0f172a; border: 1px solid #1e293b; border-radius: 20px; overflow: hidden; }
-        #map { height: 250px; border-radius: 20px; margin-bottom: 20px; background: #1e293b; } /* Цвет фона, пока карта грузится */
-        .input-field { background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: white; padding: 12px; width: 100%; outline: none; }
-        #preview { width: 100%; height: 200px; object-fit: cover; display: none; border-radius: 12px; margin-bottom: 10px; }
-        .boosted { border: 2px solid #fbbf24; box-shadow: 0 0 15px rgba(251, 191, 36, 0.3); }
+        body { background: #020617; color: #f8fafc; font-family: sans-serif; margin: 0; padding: 15px; }
+        .echo-card { background: #0f172a; border: 1px solid #1e293b; border-radius: 20px; overflow: hidden; margin-bottom: 20px; }
+        #map { height: 250px; width: 100%; border-radius: 20px; background: #1e293b; border: 2px solid #312e81; }
+        .input-field { background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: white; padding: 12px; width: 100%; margin-bottom: 8px; outline: none; }
+        #previewContainer { width: 100%; display: none; margin-bottom: 15px; }
+        #preview { width: 100%; height: 200px; object-fit: cover; border-radius: 15px; border: 2px solid #6366f1; }
+        .btn-send { background: #6366f1; width: 100%; padding: 16px; border-radius: 15px; font-weight: bold; text-transform: uppercase; }
     </style>
 </head>
-<body class="p-4 max-w-md mx-auto">
+<body>
 
-    <h1 class="text-3xl font-black italic text-indigo-500 mb-6 uppercase">Echo Pro</h1>
+    <h1 class="text-2xl font-black text-indigo-500 mb-4 italic">ECHO PRO 2.0</h1>
 
     <div id="map"></div>
+    <div id="debug-info" class="text-[10px] text-red-500 mb-2"></div>
 
-    <div class="echo-card p-5 mb-8">
-        <img id="preview">
-        <input type="text" id="itemName" placeholder="Название" class="input-field mb-2">
-        <textarea id="itemDesc" placeholder="Описание..." class="input-field mb-4 h-20"></textarea>
+    <div class="echo-card p-4">
+        <div id="previewContainer">
+            <img id="preview" src="">
+        </div>
         
+        <input type="text" id="itemName" placeholder="Название товара" class="input-field">
+        <textarea id="itemDesc" placeholder="Описание..." class="input-field h-20"></textarea>
+
         <div class="grid grid-cols-2 gap-2 mb-4">
-            <label class="bg-indigo-600 p-3 rounded-xl text-xs font-bold text-center cursor-pointer">
-                📸 ФОТО
-                <input type="file" id="fileInput" accept="image/*" class="hidden" onchange="previewImage(this)">
-            </label>
-            <div class="flex items-center justify-center bg-slate-800 rounded-xl">
+            <input type="text" id="tgNick" placeholder="Telegram @nick" class="input-field mb-0">
+            <input type="text" id="waNum" placeholder="WhatsApp (79...)" class="input-field mb-0">
+        </div>
+
+        <div class="flex gap-2 mb-4">
+            <button onclick="document.getElementById('fileInput').click()" class="flex-1 bg-slate-800 p-3 rounded-xl text-[10px] font-bold uppercase border border-indigo-500/30">
+                📸 Выбрать фото
+            </button>
+            <input type="file" id="fileInput" accept="image/*" class="hidden" onchange="handleImage(this)">
+            
+            <div class="flex items-center px-3 bg-slate-800 rounded-xl border border-amber-500/30">
                 <input type="checkbox" id="boostCheck" class="w-4 h-4 mr-2">
-                <span class="text-[10px] font-bold uppercase text-amber-400">Boost</span>
+                <span class="text-[9px] font-bold text-amber-500">BOOST</span>
             </div>
         </div>
 
-        <button onclick="sendSignal()" class="w-full bg-indigo-500 p-4 rounded-xl font-bold uppercase tracking-widest active:scale-95 transition">
-            Отправить в эфир
-        </button>
+        <button onclick="sendSignal()" class="btn-send active:scale-95 transition-all">Запустить Эхо</button>
     </div>
 
-    <div id="feed" class="space-y-6"></div>
+    <div id="feed" class="space-y-6 pb-10"></div>
 
     <script>
         let map, currentImg = "";
+        const debug = document.getElementById('debug-info');
 
-        // Исправленная инициализация карты
-        window.onload = function() {
-            try {
-                map = L.map('map').setView([55.75, 37.61], 13);
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: '© OpenStreetMap'
-                }).addTo(map);
-                
-                // Пробуем найти пользователя
-                map.locate({setView: true, maxZoom: 14});
-                loadSignals();
-            } catch (e) {
-                console.error("Ошибка карты:", e);
-                document.getElementById('map').innerHTML = "<p class='p-4 text-red-400 text-center'>Ошибка загрузки карты. Проверьте интернет.</p>";
-            }
-        };
+        // Инициализация карты с защитой
+        try {
+            map = L.map('map', { zoomControl: false }).setView([55.75, 37.61], 13);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+            
+            setTimeout(() => { map.invalidateSize(); }, 500); // Исправляет серый экран карты
 
-        // Исправленный предпросмотр фото
-        function previewImage(input) {
+            map.locate({setView: true, maxZoom: 14});
+            map.on('locationerror', () => debug.innerText += " GPS недоступен. ");
+        } catch (e) {
+            debug.innerText += "Ошибка карты: " + e.message;
+        }
+
+        // Обработка фото
+        function handleImage(input) {
             const file = input.files[0];
             if (file) {
                 const reader = new FileReader();
-                reader.onload = function(e) {
-                    const imgElement = document.getElementById('preview');
-                    imgElement.src = e.target.result;
-                    imgElement.style.display = 'block';
-                    currentImg = e.target.result;
+                reader.onload = (e) => {
+                    const preview = document.getElementById('preview');
+                    const container = document.getElementById('previewContainer');
+                    preview.src = e.target.result;
+                    container.style.display = 'block';
+currentImg = e.target.result;
+                    console.log("Фото загружено успешно");
                 };
+                reader.onerror = () => debug.innerText += " Ошибка чтения файла. ";
                 reader.readAsDataURL(file);
             }
         }
 
         function sendSignal() {
             const name = document.getElementById('itemName').value;
-            const desc = document.getElementById('itemDesc').value;
-            const isBoosted = document.getElementById('boostCheck').checked;
+            if (!name || !currentImg) return alert("Добавьте фото и название!");
 
-            if (!name || !currentImg) {
-alert("Пожалуйста, введите название и добавьте фото!");
-                return;
-            }
+            const center = map.getCenter();
+            const signal = {
+                lat: center.lat, lng: center.lng,
+                name: name,
+                desc: document.getElementById('itemDesc').value,
+                tg: document.getElementById('tgNick').value,
+                wa: document.getElementById('waNum').value,
+                isBoosted: document.getElementById('boostCheck').checked,
+                img: currentImg,
+                id: Date.now()
+            };
 
-            // Пытаемся получить координаты, если нет — ставим центр карты
-            navigator.geolocation.getCurrentPosition((pos) => {
-                saveSignal(pos.coords.latitude, pos.coords.longitude, name, desc, isBoosted);
-            }, () => {
-                const center = map.getCenter();
-                saveSignal(center.lat, center.lng, name, desc, isBoosted);
-            });
-        }
-
-        function saveSignal(lat, lng, name, desc, isBoosted) {
-            const signal = { lat, lng, name, desc, isBoosted, img: currentImg, id: Date.now() };
-            const saved = JSON.parse(localStorage.getItem('echo_v4')) || [];
+            const saved = JSON.parse(localStorage.getItem('echo_v5')) || [];
             saved.unshift(signal);
-            localStorage.setItem('echo_v4', JSON.stringify(saved));
-            location.reload(); 
+            localStorage.setItem('echo_v5', JSON.stringify(saved));
+            location.reload();
         }
 
-        function loadSignals() {
+        // Рендеринг ленты
+        (function loadSignals() {
             const feed = document.getElementById('feed');
-            const saved = JSON.parse(localStorage.getItem('echo_v4')) || [];
+            const saved = JSON.parse(localStorage.getItem('echo_v5')) || [];
             
             saved.forEach(s => {
-                // Добавляем метку на карту
                 L.marker([s.lat, s.lng]).addTo(map).bindPopup(s.name);
                 
-                // Добавляем карточку в ленту
                 const card = document.createElement('div');
-                card.className = echo-card ${s.isBoosted ? 'boosted' : ''};
+                card.className = echo-card ${s.isBoosted ? 'border-2 border-amber-500' : ''};
                 card.innerHTML = `
-                    <img src="${s.img}" class="w-full h-48 object-cover">
+                    <img src="${s.img}" style="width:100%; height:180px; object-fit:cover;">
                     <div class="p-4">
-                        <h3 class="font-bold text-lg ${s.isBoosted ? 'text-amber-400' : ''}">${s.isBoosted ? '⭐ ' : ''}${s.name}</h3>
-                        <p class="text-sm text-slate-400 mt-1">${s.desc}</p>
+                        <h3 class="font-bold ${s.isBoosted ? 'text-amber-500' : ''}">${s.name}</h3>
+                        <p class="text-xs text-slate-400 mt-1">${s.desc}</p>
                     </div>
                 `;
                 feed.appendChild(card);
             });
-        }
+        })();
     </script>
 </body>
 </html>
